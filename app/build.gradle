@@ -1,0 +1,45 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.polka.reader'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.polka.reader"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        polka {
+            storeFile file('polka.keystore')
+            storePassword 'polkareader'
+            keyAlias 'polka'
+            keyPassword 'polkareader'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.polka
+        }
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.polka
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}

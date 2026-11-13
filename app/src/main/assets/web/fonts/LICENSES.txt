@@ -1,0 +1,7 @@
+Шрифты в этой папке распространяются по свободным лицензиям:
+- Lora — Copyright The Lora Project Authors, SIL Open Font License 1.1
+- Inter — Copyright The Inter Project Authors, SIL Open Font License 1.1
+- Liberation Serif — Copyright Red Hat, Inc., SIL Open Font License 1.1
+Шрифты из папки extra/ скачиваются при сборке из репозитория Google Fonts
+(SIL Open Font License 1.1 / Apache License 2.0).
+https://openfontlicense.org

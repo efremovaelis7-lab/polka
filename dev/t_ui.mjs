@@ -1,0 +1,27 @@
+import { chromium } from '/home/claude/.npm-global/lib/node_modules/playwright/index.mjs';
+import fs from 'node:fs';
+const OUT = '/home/claude/polka/dev/out';
+fs.mkdirSync(OUT, { recursive: true });
+const b = await chromium.launch();
+const ctx = await b.newContext({ viewport: { width: 412, height: 860 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true });
+await ctx.addInitScript({ path: '/home/claude/polka/dev/mock-native.js' });
+const p = await ctx.newPage();
+const errs = [];
+p.on('console', m => { if (m.type() === 'error' || m.type() === 'warning') errs.push(m.type() + ': ' + m.text()); });
+p.on('pageerror', e => errs.push('pageerror: ' + e.message + '\n' + e.stack));
+const shot = async (n) => { await p.waitForTimeout(350); await p.screenshot({ path: `${OUT}/${n}.png` }); console.log('shot', n); };
+await p.goto('http://localhost:8765/web/index.html');
+await p.waitForTimeout(800);
+await shot('01-empty');
+await p.waitForTimeout(2000);
+await shot('02-shelf');
+console.log('books:', await p.evaluate(() => window.__polka.library.books.length));
+// открыть epub
+await p.evaluate(() => { const b = window.__polka.library.books.find(x => x.title.includes('Счастливые')); window.__polka.openBook(b); });
+await p.waitForTimeout(1500);
+await shot('03-reader-cover');
+await p.evaluate(() => window.__polka.reader.goTo({ ch: 1, i: 0 }));
+await p.waitForTimeout(600);
+await shot('04-reader-ch1');
+console.log(errs.join('\n'));
+await b.close();

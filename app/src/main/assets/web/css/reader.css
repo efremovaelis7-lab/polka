@@ -1,0 +1,155 @@
+/* ===================================================================== читалка */
+.rd {
+  --mt: 34px; --mb: 42px;
+  position: fixed; inset: 0; z-index: 50; background: var(--bg); color: var(--text);
+  visibility: hidden; opacity: 0; transition: opacity .28s, visibility 0s .28s;
+}
+.rd.open { visibility: visible; opacity: 1; transition: opacity .28s; }
+.rd:not(.open) { pointer-events: none; }
+.rd.spread { --mt: 44px; --mb: 48px; }
+
+.rd-stage { position: absolute; inset: 0; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+.sw { position: absolute; left: 0; top: 0; width: var(--W); height: var(--H); visibility: hidden; will-change: transform; }
+.sc { position: absolute; left: 0; top: 0; width: var(--W); height: var(--H); overflow: hidden; transform-origin: 0 0; }
+.si { position: absolute; left: 0; top: 0; width: var(--W); height: var(--H); overflow: hidden; transform-origin: 0 0; }
+.pg { position: absolute; inset: 0; background: var(--bg); overflow: hidden; }
+.pg.paper { background: var(--back); }
+.pg.paper .foot { display: none; }
+.sw.see-through .pg { background: var(--back); }
+.sw.see-through .rd-content { opacity: .1; }
+.sw.see-through .foot { display: none; }
+.sw.as-back { filter: drop-shadow(0 0 7px rgba(0, 0, 0, .3)); }
+.dark .sw.as-back { filter: drop-shadow(0 0 8px rgba(0, 0, 0, .7)); }
+.pg-grain { position: absolute; inset: 0; pointer-events: none; background: url("../img/paper-grain.png") 0 0 / 256px; opacity: var(--grain, 0); mix-blend-mode: multiply; }
+.pg-gutter { display: none; }
+.spread .pg-gutter {
+  display: block; position: absolute; top: 0; bottom: 0; left: calc(var(--pw) - 50px); width: 100px; pointer-events: none;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, .05) 35%, rgba(0, 0, 0, .16) 50%, rgba(0, 0, 0, .05) 65%, rgba(0, 0, 0, 0));
+}
+.dark.spread .pg-gutter { background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, .25) 40%, rgba(0, 0, 0, .55) 50%, rgba(0, 0, 0, .25) 60%, rgba(0, 0, 0, 0)); }
+
+.shade { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: none; pointer-events: none; }
+.shade-front { background: linear-gradient(to right, rgba(0, 0, 0, 0), rgba(0, 0, 0, .06) 60%, rgba(0, 0, 0, .2)); }
+.shade-back { background: linear-gradient(to right, rgba(0, 0, 0, .3), rgba(0, 0, 0, .1) 10%, rgba(255, 255, 255, .22) 32%, rgba(255, 255, 255, .06) 60%, rgba(0, 0, 0, .05)); }
+.dark .shade-back { background: linear-gradient(to right, rgba(0, 0, 0, .6), rgba(0, 0, 0, .25) 12%, rgba(255, 255, 255, .07) 35%, rgba(0, 0, 0, 0) 65%); }
+.curl-cast { position: absolute; left: 0; top: 0; transform-origin: 0 0; display: none; pointer-events: none; background: linear-gradient(to right, rgba(0, 0, 0, .5), rgba(0, 0, 0, .18) 35%, rgba(0, 0, 0, 0)); }
+.dark .curl-cast { background: linear-gradient(to right, rgba(0, 0, 0, .85), rgba(0, 0, 0, .3) 35%, rgba(0, 0, 0, 0)); }
+
+/* страницы — это колонки */
+.rd-content {
+  position: absolute; left: 0; top: var(--mt); width: var(--pw); height: calc(var(--H) - var(--mt) - var(--mb));
+  padding: 0 var(--m); column-width: calc(var(--pw) - 2 * var(--m)); column-gap: calc(2 * var(--m)); column-fill: auto;
+  will-change: transform;
+}
+
+/* типографика книги */
+.rd-content, .rd-scroll-content {
+  font-family: var(--font); font-size: var(--fs); line-height: var(--lh); font-weight: var(--weight);
+  text-align: var(--align); hyphens: var(--hyph); -webkit-hyphens: var(--hyph); color: var(--text);
+  overflow-wrap: break-word; font-kerning: normal; text-rendering: optimizeLegibility;
+}
+.rd-chapter p { margin: 0 0 var(--pspace); text-indent: var(--indent); orphans: 2; widows: 2; }
+.rd-chapter h1, .rd-chapter h2, .rd-chapter h3, .rd-chapter h4, .rd-chapter h5, .rd-chapter h6 {
+  text-align: center; text-indent: 0; line-height: 1.25; margin: 1.1em 0 .9em; break-after: avoid; hyphens: manual; -webkit-hyphens: manual; font-weight: 700;
+}
+.rd-chapter h1 { font-size: 1.5em; }
+.rd-chapter h2 { font-size: 1.32em; }
+.rd-chapter h3 { font-size: 1.16em; }
+.rd-chapter h4, .rd-chapter h5, .rd-chapter h6 { font-size: 1.05em; }
+.rd-chapter > :first-child, .rd-chapter > .section:first-child > :first-child { margin-top: .3em; }
+.rd-chapter .title span { display: inline; }
+.rd-chapter blockquote { margin: .8em 0 .8em 1.4em; }
+.rd-chapter .epigraph { margin: 1em 0 1.5em 28%; font-style: italic; font-size: .93em; text-align: left; }
+.rd-chapter .epigraph p, .rd-chapter .cite p { text-indent: 0; }
+.rd-chapter .text-author { text-align: right; font-style: italic; text-indent: 0; margin-top: .3em; }
+.rd-chapter .cite { margin: 1em 1.2em; font-size: .96em; }
+.rd-chapter .poem { margin: 1em 0 1em 10%; text-align: left; }
+.rd-chapter .stanza { margin: .6em 0; break-inside: avoid; }
+.rd-chapter .v { text-indent: 0; margin: 0; text-align: left; hyphens: manual; -webkit-hyphens: manual; padding-left: 1.2em; text-indent: -1.2em; }
+.rd-chapter .subtitle { text-align: center; text-indent: 0; font-weight: 600; margin: .9em 0; }
+.rd-chapter .annotation { font-style: italic; margin: 1em 0; }
+.rd-chapter .empty-line { height: 1em; }
+.rd-chapter .x-i { font-style: italic; }
+.rd-chapter .x-b { font-weight: 700; }
+.rd-chapter .x-c { text-align: center; text-indent: 0; }
+.rd-chapter .x-r { text-align: right; text-indent: 0; }
+.rd-chapter .x-n { text-indent: 0; }
+.rd-chapter .x-k { font-variant: small-caps; }
+.rd-chapter .x-title { text-align: center; text-indent: 0; font-weight: 700; }
+.rd-chapter .fn-hidden { display: none; }
+.rd-chapter img { max-width: 100%; max-height: calc(var(--H) - var(--mt) - var(--mb) - 1.5em); height: auto; object-fit: contain; vertical-align: middle; }
+.rd-chapter .imgp { text-align: center; text-indent: 0; margin: .8em 0; break-inside: avoid; }
+.rd-chapter .imgp img { display: inline-block; }
+.rd-chapter .x-cover { max-height: calc(var(--H) - var(--mt) - var(--mb) - 4px); }
+.rd-chapter a.lnk { color: var(--accent); text-decoration: none; }
+.rd-chapter a.noteref { font-size: .78em; vertical-align: super; line-height: 0; padding: 0 3px; }
+.rd-chapter a.noteref sup { vertical-align: baseline; font-size: 1em; }
+.rd-chapter sup, .rd-chapter sub { line-height: 0; }
+.rd-chapter table { border-collapse: collapse; margin: 1em auto; font-size: .9em; text-indent: 0; }
+.rd-chapter td, .rd-chapter th { border: 1px solid var(--muted); padding: 4px 6px; }
+.rd-chapter pre, .rd-chapter code { font-family: ui-monospace, monospace; font-size: .88em; white-space: pre-wrap; }
+.rd-chapter hr { border: 0; border-top: 1px solid var(--muted); margin: 1.2em 22%; }
+.rd-chapter ul, .rd-chapter ol { padding-left: 1.4em; text-indent: 0; }
+.rd-chapter li { text-indent: 0; }
+.rd-end { height: 0; margin: 0; padding: 0; }
+
+/* бионика */
+.bionic .rd-content, .bionic .rd-scroll-content { color: var(--rest); }
+.bionic .rd-chapter .bn { font-weight: var(--bw); color: var(--text); }
+.bionic .rd-chapter h1, .bionic .rd-chapter h2, .bionic .rd-chapter h3, .bionic .rd-chapter h4,
+.bionic .rd-chapter .title, .bionic .rd-chapter b, .bionic .rd-chapter strong { color: var(--text); }
+
+/* подвал страницы */
+.foot {
+  position: absolute; bottom: 14px; font: 11.5px/1.2 "UI", sans-serif; color: var(--muted); white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 58%; letter-spacing: .02em; font-variant-numeric: tabular-nums;
+}
+.foot-l { left: var(--m); }
+.foot-r { right: var(--m); text-align: right; }
+.spread .foot-l { max-width: calc(var(--pw) - 2 * var(--m)); }
+.spread .foot-r { max-width: calc(var(--pw) - 2 * var(--m)); }
+.pg.paper .foot { display: none; }
+
+/* панели поверх текста */
+.rd-top, .rd-bottom {
+  position: absolute; left: 0; right: 0; z-index: 20; background: var(--bg); color: var(--text);
+  transition: transform .26s cubic-bezier(.2, .8, .2, 1), opacity .2s; opacity: 0;
+}
+.rd-top {
+  top: 0; display: flex; align-items: center; gap: 2px; padding: 6px 6px; min-height: 58px; transform: translateY(-100%);
+  box-shadow: 0 1px 0 rgba(127, 127, 127, .2), 0 4px 18px rgba(0, 0, 0, .12);
+}
+.rd-bottom {
+  bottom: 0; padding: 12px 12px calc(14px + var(--safe-bottom, 0px)); transform: translateY(100%);
+  box-shadow: 0 -1px 0 rgba(127, 127, 127, .2), 0 -4px 18px rgba(0, 0, 0, .12);
+}
+.rd.chrome .rd-top, .rd.chrome .rd-bottom { transform: none; opacity: 1; }
+.rd-title { flex: 1; min-width: 0; text-align: center; font: 600 15px "UI", sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 6px; }
+.rd-row { display: flex; align-items: center; gap: 8px; padding: 0 6px; }
+.rd-row + .rd-row { margin-top: 6px; }
+.rd-ch { flex: 1; min-width: 0; font: 13px "UI", sans-serif; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rd-pct { font: 600 13px "UI", sans-serif; font-variant-numeric: tabular-nums; }
+.rd-slider { flex: 1; accent-color: var(--accent); height: 30px; }
+.link-back {
+  position: absolute; z-index: 15; left: 50%; bottom: 56px; display: flex; align-items: center; gap: 4px;
+  padding: 8px 16px 8px 10px; border: 0; border-radius: 22px; background: var(--text); color: var(--bg);
+  font: 600 14px "UI", sans-serif; transform: translate(-50%, 16px); opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+}
+.link-back.show { opacity: .92; transform: translate(-50%, 0); pointer-events: auto; }
+.link-back .ic { width: 20px; height: 20px; }
+
+/* режим прокрутки */
+.rd-scroll { position: absolute; inset: 0; overflow-y: auto; display: none; background: var(--bg); overscroll-behavior: contain; }
+.mode-scroll .rd-scroll { display: block; }
+.mode-scroll .rd-stage { display: none; }
+.rd-scroll-content { max-width: 44em; margin: 0 auto; padding: 36px var(--m) 90px; }
+.scroll-nav {
+  display: block; width: 100%; margin: 26px 0; padding: 15px; border-radius: 14px; border: 1px solid var(--muted);
+  background: transparent; color: var(--text); font: 15px "UI", sans-serif; text-align: center;
+}
+.scroll-end { text-align: center; color: var(--muted); font: italic 15px var(--font); margin: 40px 0; }
+
+/* тема оформления в листах поверх читалки */
+.settings-sheet .panel { padding-bottom: 28px; }
