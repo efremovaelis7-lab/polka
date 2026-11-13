@@ -21,6 +21,16 @@ const P = {
   folder: '<path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>',
   file: '<path d="M6 3h8l5 5v12a1 1 0 01-1 1H6a1 1 0 01-1-1V4a1 1 0 011-1z"/><path d="M14 3v5h5"/>',
   font: '<path d="M5 20L11 4h2l6 16M7.5 14h9"/>',
+  bookmark: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z"/>',
+  bookmarkOn: '<path d="M6.5 3.5h11v17l-5.5-4-5.5 4z" fill="currentColor"/>',
+  notes: '<path d="M4 20h4L19 9a2.1 2.1 0 00-3-3L5 17z"/><path d="M14 8l3 3"/><path d="M13 20h7"/>',
+  quote: '<path d="M10 11H6.5A1.5 1.5 0 015 9.5V8a2 2 0 012-2h1.5A1.5 1.5 0 0110 7.5V12c0 3-1.5 5-4.5 6M19 11h-3.5A1.5 1.5 0 0114 9.5V8a2 2 0 012-2h1.5A1.5 1.5 0 0119 7.5V12c0 3-1.5 5-4.5 6"/>',
+  copy: '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5.5A1.5 1.5 0 0014.5 4h-9A1.5 1.5 0 004 5.5v9A1.5 1.5 0 005.5 16H8"/>',
+  share: '<path d="M12 3v12M7.5 7.5L12 3l4.5 4.5"/><path d="M5 12v6.5A1.5 1.5 0 006.5 20h11a1.5 1.5 0 001.5-1.5V12"/>',
+  target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
+  flame: '<path d="M12 21c-3.9 0-6.5-2.6-6.5-6.2 0-3.2 2.2-5.2 3.6-7 .5 1.6 1.4 2.6 2.4 3 0-3 1-5.7 3.3-7.8.3 3.3 1.7 5 3 6.8 1.1 1.5 1.7 3 1.7 5 0 3.6-2.6 6.2-7.5 6.2z"/>',
+  clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  minus: '<path d="M5 12h14"/>',
 };
 
 export function icon(name, cls = '') {

@@ -52,6 +52,16 @@ export const native = {
   setBrightness: v => N && N.setBrightness(v),
   setSystemBars: (color, light, full) => N && N.setSystemBars(color, !!light, !!full),
   toast: t => N && N.toast(t),
+  setCustomSelection: on => N && N.setCustomSelection && N.setCustomSelection(!!on),
+  async copyText(t) {
+    if (N && N.copyText) { N.copyText(t); return true; }
+    try { await navigator.clipboard.writeText(t); return true; } catch (e) { return false; }
+  },
+  async shareText(t) {
+    if (N && N.shareText) { N.shareText(t); return true; }
+    if (navigator.share) { try { await navigator.share({ text: t }); return true; } catch (e) { return false; } }
+    return this.copyText(t);
+  },
   version: () => (N && N.version ? N.version() : 'web'),
   fileUrl: p => '/file?p=' + encodeURIComponent(p),
 };

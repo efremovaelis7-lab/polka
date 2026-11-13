@@ -30,6 +30,9 @@ get "ofl/montserrat/Montserrat%5Bwght%5D.ttf"                 Montserrat.ttf
 get "ofl/montserrat/Montserrat-Italic%5Bwght%5D.ttf"          Montserrat-Italic.ttf
 get "ofl/comfortaa/Comfortaa%5Bwght%5D.ttf"                   Comfortaa.ttf
 get "apache/robotoslab/RobotoSlab%5Bwght%5D.ttf"              RobotoSlab.ttf
+get "ofl/jetbrainsmono/JetBrainsMono%5Bwght%5D.ttf"            JetBrainsMono.ttf
+get "ofl/jetbrainsmono/JetBrainsMono-Italic%5Bwght%5D.ttf"     JetBrainsMono-Italic.ttf
+get "ofl/ptmono/PTM55FT.ttf"                                  PTMono.ttf
 # список того, что реально скачалось — его читает приложение
 ( cd "$D" && ls -1 *.ttf 2>/dev/null | python3 -c 'import sys,json; print(json.dumps([l.strip() for l in sys.stdin if l.strip()]))' > manifest.json )
 cat "$D/manifest.json"

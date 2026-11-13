@@ -44,7 +44,7 @@ export function openSettingsPanel() {
   const themes = h('div', { class: 'themes' });
   const renderThemes = () => {
     themes.replaceChildren(...THEMES.map(t => h('button', {
-      class: 'theme-dot' + (settings.get('theme') === t.id ? ' on' : ''),
+      class: 'theme-dot t-' + t.id + (settings.get('theme') === t.id ? ' on' : ''),
       style: { background: t.bg, color: t.text },
       onclick: () => { settings.set({ theme: t.id }); renderThemes(); syncPanel(); },
     }, h('span', { class: 'td-aa', text: 'Аа' }), h('span', { class: 'td-name', text: t.name }))));

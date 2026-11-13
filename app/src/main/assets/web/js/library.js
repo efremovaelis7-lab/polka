@@ -3,6 +3,7 @@ import { db } from './db.js';
 import { native, isNative } from './native.js';
 import { openBook } from './book.js';
 import { hashStr } from './ui.js';
+import { statusOf } from './tracker.js';
 
 const coverUrls = new Map();
 const subs = new Set();
@@ -157,6 +158,23 @@ export const library = {
     return { added, failed };
   },
 
+  async setStatus(rec, status) {
+    rec.status = status;
+    if (status === 'done') {
+      rec.finished = true;
+      rec.finishedAt = rec.finishedAt || Date.now();
+    } else {
+      rec.finished = false;
+      rec.finishedAt = null;
+    }
+    await this.update(rec);
+    this.emit();
+  },
+
+  count(status) {
+    return status === 'all' ? this.books.length : this.books.filter(b => statusOf(b) === status).length;
+  },
+
   async update(rec) {
     const i = this.books.findIndex(b => b.id === rec.id);
     if (i >= 0) this.books[i] = rec;
@@ -191,8 +209,8 @@ export const library = {
     await db.set('ignored', []);
   },
 
-  sorted(sort, query) {
-    let list = [...this.books];
+  sorted(sort, query, tab = 'all') {
+    let list = tab === 'all' ? [...this.books] : this.books.filter(b => statusOf(b) === tab);
     if (query) {
       const q = query.toLowerCase();
       list = list.filter(b => (b.title + ' ' + (b.authors || []).join(' ') + ' ' + (b.series || '')).toLowerCase().includes(q));
@@ -202,6 +220,7 @@ export const library = {
     if (sort === 'title') list.sort((a, b) => cmp(a.title, b.title));
     else if (sort === 'author') list.sort((a, b) => cmp(author(a), author(b)) || cmp(a.series || '', b.series || '') || (+a.seriesIndex || 0) - (+b.seriesIndex || 0) || cmp(a.title, b.title));
     else if (sort === 'added') list.sort((a, b) => b.addedAt - a.addedAt);
+    else if (tab === 'done') list.sort((a, b) => (b.finishedAt || 0) - (a.finishedAt || 0));
     else list.sort((a, b) => (b.lastOpened || b.addedAt / 1e3) - (a.lastOpened || a.addedAt / 1e3));
     return list;
   },

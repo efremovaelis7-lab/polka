@@ -15,5 +15,8 @@
     setVolumeKeys(v) { window.__mockLog.push('vol:' + v); }, setKeepScreenOn() {}, setBrightness() {},
     setSystemBars(c, l, f) { window.__mockLog.push(`bars:${c}:${l}:${f}`); },
     toast(t) { window.__mockLog.push('toast:' + t); },
+    setCustomSelection(v) { window.__mockLog.push('customSel:' + v); },
+    copyText(t) { window.__mockLog.push('copy:' + t); },
+    shareText(t) { window.__mockLog.push('share:' + t); },
   };
 })();

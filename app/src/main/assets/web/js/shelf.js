@@ -3,6 +3,10 @@ import { settings, SHELVES } from './settings.js';
 import { library } from './library.js';
 import { h, icon, esc, sheet, confirmDialog, toast, back, plural, hashStr } from './ui.js';
 import { isNative, native } from './native.js';
+import { statusOf } from './tracker.js';
+import { openTracker } from './tracker-ui.js';
+
+export const TABS = [['all', 'Все'], ['reading', 'Читаю'], ['want', 'Хочу прочесть'], ['done', 'Прочитано']];
 
 const CLOTH = [
   ['#6d1f2a', '#e9c77b'], ['#1f3a5f', '#e6d3a3'], ['#2f4f3a', '#e8d9a8'], ['#5b3a1e', '#f0d9a6'],
@@ -21,17 +25,19 @@ export class Shelf {
       h('button', { class: 'icon-btn sm', html: icon('close'), 'aria-label': 'Закрыть поиск', onclick: () => this.closeSearch() }));
     this.top = h('header', { class: 'shelf-top' },
       h('div', { class: 'brand' }, h('span', { class: 'brand-t', text: 'Полка' }), this.countEl = h('span', { class: 'brand-c' })),
+      h('button', { class: 'icon-btn', 'aria-label': 'Трекер чтения', html: icon('target'), onclick: () => openTracker(this.app) }),
       h('button', { class: 'icon-btn', 'aria-label': 'Поиск', html: icon('search'), onclick: () => this.openSearch() }),
       h('button', { class: 'icon-btn', 'aria-label': 'Добавить книги', html: icon('plus'), onclick: () => this.app.importFiles() }),
       h('button', { class: 'icon-btn', 'aria-label': 'Меню', html: icon('more'), onclick: () => this.openMenu() }));
+    this.tabs = h('div', { class: 'shelf-tabs' });
     this.banner = h('div', { class: 'banner' });
     this.list = h('div', { class: 'shelves' });
     this.scroller = h('div', { class: 'shelf-scroll' }, this.banner, this.list);
-    this.root.append(this.top, this.searchBar, this.scroller);
+    this.root.append(this.top, this.searchBar, this.tabs, this.scroller);
     document.body.appendChild(this.root);
     window.addEventListener('resize', () => { clearTimeout(this._rt); this._rt = setTimeout(() => this.render(), 150); });
     library.on(() => this.render());
-    settings.on(ch => { if ('shelfTheme' in ch || 'shelfView' in ch || 'sort' in ch) this.render(); });
+    settings.on(ch => { if ('shelfTheme' in ch || 'shelfView' in ch || 'sort' in ch || 'shelfTab' in ch) this.render(); });
   }
 
   applyTheme() {
@@ -65,14 +71,24 @@ export class Shelf {
 
   async render() {
     this.applyTheme();
-    const books = library.sorted(settings.get('sort'), this.query);
+    const tab = settings.get('shelfTab') || 'all';
+    const books = library.sorted(settings.get('sort'), this.query, tab);
     const n = library.books.length;
+    this.renderTabs(tab);
     this.countEl.textContent = n ? `${n} ${plural(n, 'книга', 'книги', 'книг')}` : '';
     const view = settings.get('shelfView');
     this.root.classList.toggle('as-list', view === 'list');
     const token = (this._renderToken = (this._renderToken || 0) + 1);
     if (!n) { this.list.replaceChildren(this.emptyState()); return; }
-    if (!books.length) { this.list.replaceChildren(h('div', { class: 'nothing', text: 'Ничего не нашлось' })); return; }
+    if (!books.length) {
+      const msg = this.query ? 'Ничего не нашлось' : {
+        reading: 'Сейчас ничего не читается. Открой любую книгу — она появится здесь.',
+        want: 'Сюда попадают книги с отметкой «Хочу прочесть». Задержи палец на обложке и выбери эту отметку.',
+        done: 'Прочитанные книги появятся здесь, когда дочитаешь до конца или отметишь вручную.',
+      }[tab] || 'Ничего не нашлось';
+      this.list.replaceChildren(h('div', { class: 'nothing', text: msg }));
+      return;
+    }
     const nodes = view === 'list' ? this.renderList(books) : this.renderShelves(books);
     if (token !== this._renderToken) return;
     this.list.replaceChildren(...nodes);
@@ -89,6 +105,14 @@ export class Shelf {
         img.src = url;
       });
     }
+  }
+
+  renderTabs(tab) {
+    this.tabs.replaceChildren(...TABS.map(([k, t]) => {
+      const c = library.count(k);
+      return h('button', { class: 'tab' + (tab === k ? ' on' : ''), onclick: () => settings.set({ shelfTab: k }) },
+        h('span', { text: t }), c ? h('span', { class: 'tab-c', text: c }) : null);
+    }));
   }
 
   perRow() {
@@ -129,7 +153,9 @@ export class Shelf {
   bookEl(b) {
     const box = this.coverBox(b);
     const el = h('div', { class: 'book', 'data-id': b.id }, box);
-    if (!b.lastOpened && !b.finished) box.appendChild(h('div', { class: 'ribbon', text: 'новая' }));
+    const st = statusOf(b);
+    if (st === 'new') box.appendChild(h('div', { class: 'ribbon', text: 'новая' }));
+    else if (st === 'want') box.appendChild(h('div', { class: 'ribbon want', text: 'хочу' }));
     if (b.finished) box.appendChild(h('div', { class: 'done-badge', html: icon('check') }));
     else if (b.progress > 0.005) box.appendChild(h('div', { class: 'prog' }, h('i', { style: { width: Math.round(b.progress * 100) + '%' } })));
     this.bindPress(el, b);
@@ -146,7 +172,7 @@ export class Shelf {
           h('div', { class: 'li-title', text: b.title }),
           meta ? h('div', { class: 'li-meta', text: meta }) : null,
           h('div', { class: 'li-prog' }, h('div', { class: 'li-bar' }, h('i', { style: { width: pct + '%' } })),
-            h('span', { text: b.finished ? 'прочитана' : !b.lastOpened ? 'новая' : pct + '%' }))));
+            h('span', { text: { done: 'прочитана', new: 'новая', want: 'хочу прочесть' }[statusOf(b)] || pct + '%' }))));
       this.bindPress(el, b);
       return el;
     });
@@ -185,6 +211,15 @@ export class Shelf {
     const author = (b.authors || []).join(', ');
     const series = b.series ? `${b.series}${b.seriesIndex ? ', книга ' + b.seriesIndex : ''}` : '';
     const size = b.size ? (b.size > 1048576 ? (b.size / 1048576).toFixed(1) + ' МБ' : Math.round(b.size / 1024) + ' КБ') : '';
+    const statusSeg = h('div', { class: 'seg status-seg' });
+    const renderStatus = () => statusSeg.replaceChildren(...[['reading', 'Читаю'], ['want', 'Хочу прочесть'], ['done', 'Прочитано']].map(([k, t]) =>
+      h('button', { class: 'seg-b' + (statusOf(b) === k ? ' on' : ''), text: t, onclick: async () => {
+        await library.setStatus(b, statusOf(b) === k ? (b.lastOpened ? 'reading' : null) : k);
+        if (k === 'done' && b.status === 'done') b.progress = Math.max(b.progress || 0, 1);
+        renderStatus();
+        toast({ reading: 'Отмечено: читаю', want: 'Добавлено в «Хочу прочесть»', done: 'Отмечено как прочитанное' }[b.status] || 'Отметка снята', 1500);
+      } })));
+    renderStatus();
     const content = h('div', { class: 'book-menu' },
       h('div', { class: 'bm-head' }, box,
         h('div', { class: 'bm-info' },
@@ -195,13 +230,7 @@ export class Shelf {
       b.annotation ? h('div', { class: 'bm-annot', text: b.annotation }) : null,
       h('div', { class: 'bm-actions' },
         h('button', { class: 'btn primary', html: icon('book') + '<span>' + (b.lastOpened ? 'Продолжить' : 'Читать') + '</span>', onclick: () => { sh.close(); this.app.openBook(b); } }),
-        h('button', { class: 'btn ghost', html: icon('check') + '<span>' + (b.finished ? 'Снять отметку «прочитана»' : 'Отметить прочитанной') + '</span>', onclick: async () => {
-          b.finished = !b.finished;
-          if (b.finished) b.progress = 1;
-          await library.update(b);
-          sh.close();
-          this.render();
-        } }),
+        statusSeg,
         h('button', { class: 'btn ghost danger-text', html: icon('trash') + '<span>Убрать с полки</span>', onclick: async () => {
           const own = b.source === 'blob' || (b.path && /\/files\/books\//.test(b.path));
           const ok = await confirmDialog({ title: 'Убрать книгу с полки?', text: own ? 'Копия файла в приложении будет удалена.' : 'Сам файл останется в памяти телефона, просто исчезнет с полки.', ok: 'Убрать', danger: true });
@@ -225,7 +254,14 @@ export class Shelf {
     const content = h('div', { class: 'panel shelf-menu' },
       h('div', { class: 'menu-actions' },
         isNative ? h('button', { class: 'menu-btn', html: icon('scan') + '<span>Найти книги на телефоне</span>', onclick: () => { sh.close(); this.app.scan(true); } }) : null,
-        h('button', { class: 'menu-btn', html: icon('file') + '<span>Добавить файлы</span>', onclick: () => { sh.close(); this.app.importFiles(); } })),
+        h('button', { class: 'menu-btn', html: icon('file') + '<span>Добавить файлы</span>', onclick: () => { sh.close(); this.app.importFiles(); } }),
+        h('button', { class: 'menu-btn', html: icon('target') + '<span>Трекер чтения и цели</span>', onclick: () => { sh.close(); openTracker(this.app); } })),
+      h('div', { class: 'p-sec' },
+        h('div', { class: 'p-h', text: 'Подборки' }),
+        h('div', { class: 'collections' }, ...TABS.map(([k, t]) => h('button', {
+          class: 'coll' + ((settings.get('shelfTab') || 'all') === k ? ' on' : ''),
+          onclick: () => { settings.set({ shelfTab: k }); sh.close(); },
+        }, h('span', { text: t }), h('span', { class: 'coll-c', text: library.count(k) }))))),
       h('div', { class: 'p-sec' },
         h('div', { class: 'p-h', text: 'Вид' }), seg('shelfView', [['shelf', 'Полки'], ['list', 'Список']]),
         h('div', { class: 'p-h', text: 'Полки' }),

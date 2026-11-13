@@ -21,11 +21,14 @@ const EXTRA = [
   { id: 'montserrat', name: 'Montserrat', files: [['Montserrat.ttf', '100 900'], ['Montserrat-Italic.ttf', '100 900', 'italic']] },
   { id: 'comfortaa', name: 'Comfortaa', files: [['Comfortaa.ttf', '300 700']] },
   { id: 'robotoslab', name: 'Roboto Slab', files: [['RobotoSlab.ttf', '100 900']] },
+  { id: 'jetbrains', name: 'JetBrains Mono', files: [['JetBrainsMono.ttf', '100 800'], ['JetBrainsMono-Italic.ttf', '100 800', 'italic']] },
+  { id: 'ptmono', name: 'PT Mono', files: [['PTMono.ttf', '400']] },
 ];
 
 const SYSTEM = [
   { id: 'serif', name: 'Системный', family: 'serif' },
   { id: 'sans', name: 'Без засечек', family: 'sans-serif' },
+  { id: 'mono', name: 'Машинка', family: 'monospace' },
 ];
 
 export const fonts = {

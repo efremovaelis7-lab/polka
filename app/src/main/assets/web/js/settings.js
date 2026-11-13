@@ -6,9 +6,10 @@ export const THEMES = [
   { id: 'sepia', name: 'Сепия', bg: '#F2E5CB', text: '#4B3826', muted: '#9C8366', accent: '#A0522D', back: '#E6D6B6', light: true, grain: 0.55 },
   { id: 'sage', name: 'Шалфей', bg: '#E1E9D9', text: '#28352A', muted: '#7D8C78', accent: '#3F7350', back: '#D3DDC9', light: true, grain: 0.25 },
   { id: 'lavender', name: 'Лаванда', bg: '#ECE6F3', text: '#342B44', muted: '#8F86A0', accent: '#7A4FB0', back: '#DFD7EA', light: true, grain: 0.2 },
-  { id: 'dusk', name: 'Сумерки', bg: '#2E333B', text: '#D3D0C8', muted: '#8A8F98', accent: '#8FB4E8', back: '#262A31', light: false },
-  { id: 'night', name: 'Ночь', bg: '#1B1814', text: '#CDBDA3', muted: '#7E715F', accent: '#E0A75E', back: '#141210', light: false, grain: 0.15 },
-  { id: 'black', name: 'Чёрная', bg: '#000000', text: '#ABABAB', muted: '#666666', accent: '#C9A26B', back: '#0B0B0B', light: false },
+  { id: 'dusk', name: 'Сумерки', bg: '#2B3038', text: '#F1EEE8', muted: '#9AA1AC', accent: '#8FB4E8', back: '#23272E', light: false },
+  { id: 'night', name: 'Ночь', bg: '#1A1714', text: '#F5ECDD', muted: '#8E8170', accent: '#E8B06A', back: '#13110F', light: false, grain: 0.12 },
+  { id: 'black', name: 'Чёрная', bg: '#000000', text: '#FFFFFF', muted: '#7C7C7C', accent: '#D9B27A', back: '#0E0E0E', light: false },
+  { id: 'matrix', name: 'Матрица', bg: '#000000', text: '#3DFF7A', muted: '#1F9A45', accent: '#9DFFB8', back: '#021A0A', light: false, glow: true },
 ];
 
 export const SHELVES = [
@@ -44,6 +45,7 @@ const DEFAULTS = {
   shelfTheme: 'oak',
   shelfView: 'shelf',
   sort: 'recent',
+  shelfTab: 'all',
   autoScan: true,
   customFonts: [],
 };

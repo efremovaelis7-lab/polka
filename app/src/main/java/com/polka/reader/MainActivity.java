@@ -3,10 +3,13 @@ package com.polka.reader;
 import android.Manifest;
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -15,7 +18,10 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.provider.Settings;
+import android.view.ActionMode;
 import android.view.KeyEvent;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -60,7 +66,7 @@ public class MainActivity extends Activity {
     private static final int REQ_PICK_FONT = 102;
     private static final int REQ_PERMISSION = 103;
 
-    private WebView web;
+    private PolkaWebView web;
     private final Handler main = new Handler(Looper.getMainLooper());
 
     private String pendingPickCallback = null;
@@ -75,7 +81,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        web = new WebView(this);
+        web = new PolkaWebView(this);
         web.setBackgroundColor(Color.parseColor("#2A1B12"));
         web.setOverScrollMode(View.OVER_SCROLL_NEVER);
         web.setVerticalScrollBarEnabled(false);
@@ -624,8 +630,93 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
+        public void setCustomSelection(boolean on) {
+            web.customSelection = on;
+        }
+
+        @JavascriptInterface
+        public void copyText(final String text) {
+            main.post(() -> {
+                ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                if (cm != null) cm.setPrimaryClip(ClipData.newPlainText("Полка", text));
+            });
+        }
+
+        @JavascriptInterface
+        public void shareText(final String text) {
+            main.post(() -> {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("text/plain");
+                i.putExtra(Intent.EXTRA_TEXT, text);
+                try {
+                    startActivity(Intent.createChooser(i, "Поделиться"));
+                } catch (Exception ignored) {
+                }
+            });
+        }
+
+        @JavascriptInterface
         public void toast(final String text) {
             main.post(() -> Toast.makeText(MainActivity.this, text, Toast.LENGTH_SHORT).show());
+        }
+    }
+
+    /**
+     * WebView, у которого при чтении прячется стандартное меню выделения
+     * (вместо него «Полка» показывает свою панель: маркер, заметка, копировать, поделиться).
+     */
+    static class PolkaWebView extends WebView {
+        volatile boolean customSelection = false;
+
+        PolkaWebView(Context context) {
+            super(context);
+        }
+
+        @Override
+        public ActionMode startActionMode(ActionMode.Callback callback) {
+            return super.startActionMode(customSelection ? wrap(callback) : callback);
+        }
+
+        @Override
+        public ActionMode startActionMode(ActionMode.Callback callback, int type) {
+            return super.startActionMode(customSelection ? wrap(callback) : callback, type);
+        }
+
+        private ActionMode.Callback wrap(final ActionMode.Callback cb) {
+            return new ActionMode.Callback2() {
+                @Override
+                public boolean onCreateActionMode(ActionMode mode, Menu menu) {
+                    boolean r = cb.onCreateActionMode(mode, menu);
+                    menu.clear();
+                    return r;
+                }
+
+                @Override
+                public boolean onPrepareActionMode(ActionMode mode, Menu menu) {
+                    boolean r = cb.onPrepareActionMode(mode, menu);
+                    menu.clear();
+                    return r;
+                }
+
+                @Override
+                public boolean onActionItemClicked(ActionMode mode, MenuItem item) {
+                    return cb.onActionItemClicked(mode, item);
+                }
+
+                @Override
+                public void onDestroyActionMode(ActionMode mode) {
+                    cb.onDestroyActionMode(mode);
+                }
+
+                @Override
+                public void onGetContentRect(ActionMode mode, View view, Rect outRect) {
+                    if (cb instanceof ActionMode.Callback2) {
+                        ((ActionMode.Callback2) cb).onGetContentRect(mode, view, outRect);
+                    } else {
+                        super.onGetContentRect(mode, view, outRect);
+                    }
+                }
+            };
         }
     }
 }

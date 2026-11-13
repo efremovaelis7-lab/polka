@@ -5,13 +5,17 @@ let dbp = null;
 function open() {
   if (dbp) return dbp;
   dbp = new Promise((resolve, reject) => {
-    const r = indexedDB.open('polka', 1);
+    const r = indexedDB.open('polka', 2);
     r.onupgradeneeded = () => {
       const db = r.result;
       if (!db.objectStoreNames.contains('books')) db.createObjectStore('books', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('covers')) db.createObjectStore('covers');
       if (!db.objectStoreNames.contains('files')) db.createObjectStore('files');
       if (!db.objectStoreNames.contains('kv')) db.createObjectStore('kv');
+      if (!db.objectStoreNames.contains('notes')) {
+        const s = db.createObjectStore('notes', { keyPath: 'id' });
+        s.createIndex('book', 'book');
+      }
     };
     r.onsuccess = () => resolve(r.result);
     r.onerror = () => reject(r.error);
@@ -43,6 +47,10 @@ export const db = {
   getFile: id => tx('files', 'readonly', s => s.get(id)),
   putFile: (id, blob) => tx('files', 'readwrite', s => s.put(blob, id)),
   delFile: id => tx('files', 'readwrite', s => s.delete(id)),
+  notesFor: book => tx('notes', 'readonly', s => s.index('book').getAll(book)),
+  allNotes: () => tx('notes', 'readonly', s => s.getAll()),
+  putNote: n => tx('notes', 'readwrite', s => s.put(n)),
+  delNote: id => tx('notes', 'readwrite', s => s.delete(id)),
   get: k => tx('kv', 'readonly', s => s.get(k)),
   set: (k, v) => tx('kv', 'readwrite', s => s.put(v, k)),
 };

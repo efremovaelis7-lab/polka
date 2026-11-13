@@ -8,6 +8,10 @@ import { h, icon, back, sheet, toast, debounce } from './ui.js';
 import { native } from './native.js';
 import { openSettingsPanel } from './panel.js';
 import { cssEsc } from './epub.js';
+import { db } from './db.js';
+import { tracker, statusOf } from './tracker.js';
+import { applyHighlights } from './annotations.js';
+import { installNotes } from './reader-notes.js';
 
 const BLOCKS = 'p,h1,h2,h3,h4,h5,h6,li,dt,dd,pre,table,.imgp,.empty-line,figure,hr';
 const LAYOUT_KEYS = ['font', 'fontSize', 'lineHeight', 'margin', 'align', 'hyphens', 'indent', 'paraSpace', 'weight', 'bionicWeight', 'spread', 'mode'];
@@ -130,6 +134,7 @@ export class Reader {
     this.buildChrome();
     this.root.append(this.stage, this.scrollEl, this.top, this.bottom);
     document.body.appendChild(this.root);
+    this.initNotes();
 
     settings.on(ch => this.onSettings(ch));
     window.addEventListener('resize', debounce(() => { if (this.book) this.relayout(); }, 180));
@@ -169,6 +174,10 @@ export class Reader {
     this.hideChrome();
     this.backToken = back.push(() => this.close());
     this.applyDevice();
+    this.notes = (await db.notesFor(rec.id)) || [];
+    if (statusOf(rec) !== 'done') rec.status = 'reading';
+    native.setCustomSelection(true);
+    tracker.activity(0);
     const pos = rec.pos || { ch: 0, i: 0 };
     if (pos.ch >= book.chapters.length) pos.ch = 0;
     await this.goTo(pos);
@@ -177,11 +186,16 @@ export class Reader {
   close() {
     if (this.hidden) return;
     this.save.flush();
+    this.clearSelection();
+    native.setCustomSelection(false);
+    tracker.pause();
     if (this.backToken) { back.remove(this.backToken); this.backToken = null; }
     this.hidden = true;
     this.root.classList.remove('open');
     native.setVolumeKeys(false);
     native.setKeepScreenOn(false);
+    document.body.style.removeProperty('--ui-accent');
+    document.body.style.removeProperty('--ui-accent-fg');
     native.setBrightness(-1);
     this.hideChrome(true);
     const book = this.book;
@@ -229,6 +243,11 @@ export class Reader {
     st.setProperty('--bw', s.bionicWeight);
     st.setProperty('--grain', s.grain ? (t.grain || 0) : 0);
     this.root.classList.toggle('dark', !t.light);
+    this.root.classList.toggle('glow', !!t.glow);
+    if (!this.hidden) {
+      document.body.style.setProperty('--ui-accent', t.accent);
+      document.body.style.setProperty('--ui-accent-fg', t.light ? '#fff' : t.bg);
+    }
     this.root.classList.toggle('bionic', !!s.bionic);
     this.root.classList.toggle('no-indent', !s.indent);
     this.root.dataset.theme = t.id;
@@ -260,6 +279,8 @@ export class Reader {
     wrap.className = 'rd-chapter';
     wrap.appendChild(frag);
     wrap.querySelectorAll(BLOCKS).forEach((el, i) => el.setAttribute('data-i', i));
+    const hls = (this.notes || []).filter(n => n.type === 'hl' && n.ch === ch);
+    if (hls.length) applyHighlights(wrap, hls);
     if (settings.get('bionic')) bionicify(wrap, settings.get('bionicStrength'));
     const end = document.createElement('div');
     end.className = 'rd-end';
@@ -344,8 +365,10 @@ export class Reader {
     });
   }
 
-  afterMove() {
+  afterMove(pages = 0) {
     this.updateChrome();
+    this.updateRibbon();
+    if (pages) tracker.activity(pages);
     this.save();
   }
 
@@ -362,7 +385,12 @@ export class Reader {
     this.rec.pos = a;
     this.rec.progress = pct;
     this.rec.lastOpened = Date.now();
-    if (pct >= 0.995) this.rec.finished = true;
+    if (pct >= 0.995 && this.rec.status !== 'done') {
+      this.rec.status = 'done';
+      this.rec.finished = true;
+      this.rec.finishedAt = Date.now();
+      toast('Книга прочитана! Она переехала на полку «Прочитано»', 3200);
+    }
     this.app.library.update(this.rec);
   }
 
@@ -516,7 +544,7 @@ export class Reader {
       this.ch = st.tgt.ch;
       this.page = st.tgt.page;
       this.hideLinkBack();
-      this.afterMove();
+      this.afterMove(this.step);
       this.preload();
     } else {
       this.setFront(st.front);
@@ -570,7 +598,8 @@ export class Reader {
       if (ptr.hist.length > 6) ptr.hist.shift();
       const dx = p.x - ptr.x0, dy = p.y - ptr.y0;
       if (!ptr.drag && !ptr.vertical && Math.hypot(dx, dy) > 10) {
-        if (Math.abs(dx) > Math.abs(dy) * 1.1 && !this.busy && this.chromeHidden) {
+        const slow = performance.now() - ptr.t0 > 350; // долгое нажатие и протяжка — это выделение текста
+        if (!slow && Math.abs(dx) > Math.abs(dy) * 1.1 && !this.busy && this.chromeHidden && !this.hasSelection()) {
           ptr.drag = true;
           try { stage.setPointerCapture(e.pointerId); } catch (er) { /* ignore */ }
           const dir = dx < 0 ? 1 : -1;
@@ -605,7 +634,6 @@ export class Reader {
     };
     stage.addEventListener('pointerup', up);
     stage.addEventListener('pointercancel', e => { if (ptr && ptr.drag && ptr.st && !ptr.done) { ptr.up = true; this.release(ptr, true); } ptr = null; });
-    stage.addEventListener('contextmenu', e => e.preventDefault());
 
     let wheelT = 0;
     stage.addEventListener('wheel', e => {
@@ -617,13 +645,23 @@ export class Reader {
 
     // режим прокрутки
     this.scrollEl.addEventListener('click', e => {
+      if (this.selInfo || this.hasSelection()) { this.clearSelection(); return; }
+      const mk = e.target.closest('mark.hl');
+      if (mk) { this.openNote(mk.dataset.a); return; }
       const a = e.target.closest('a.lnk');
       if (a) { e.preventDefault(); this.followLink(a); return; }
       const nav = e.target.closest('[data-goto]');
       if (nav) { this.goTo({ ch: +nav.dataset.goto, i: 0 }); return; }
       this.toggleChrome();
     });
-    this.scrollEl.addEventListener('scroll', debounce(() => { if (this.mode === 'scroll' && this.book) { this.updateChrome(); this.save(); } }, 250), { passive: true });
+    this.scrollEl.addEventListener('scroll', debounce(() => {
+      if (this.mode !== 'scroll' || !this.book) return;
+      const el = this.scrollEl;
+      const d = Math.abs(el.scrollTop - (this._lastScroll || 0)) / Math.max(1, el.clientHeight);
+      this._lastScroll = el.scrollTop;
+      this.afterMove(Math.round(d));
+      if (!d) tracker.activity(0);
+    }, 250), { passive: true });
   }
 
   dragTo(p) {
@@ -657,6 +695,10 @@ export class Reader {
   }
 
   tap(x, y, target) {
+    if (this.selInfo || this.hasSelection()) { this.clearSelection(); return; }
+    const mk = target && target.closest && target.closest('mark.hl');
+    if (mk && this.chromeHidden) { this.openNote(mk.dataset.a); return; }
+    if (this.chromeHidden && x > this.W * 0.86 && y < Math.min(90, this.H * 0.1)) { this.toggleBookmark(); return; }
     const a = target && target.closest && target.closest('a.lnk');
     if (a && this.chromeHidden) { this.followLink(a); return; }
     if (!this.chromeHidden) { this.hideChrome(); return; }
@@ -757,6 +799,8 @@ export class Reader {
     this.top = h('div', { class: 'rd-top' },
       h('button', { class: 'icon-btn', 'aria-label': 'На полку', html: icon('back'), onclick: () => this.close() }),
       this.title,
+      this.bmBtn = h('button', { class: 'icon-btn', 'aria-label': 'Закладка', html: icon('bookmark'), onclick: () => this.toggleBookmark() }),
+      h('button', { class: 'icon-btn', 'aria-label': 'Заметки', html: icon('notes'), onclick: () => this.openNotesList() }),
       h('button', { class: 'icon-btn', 'aria-label': 'Оглавление', html: icon('toc'), onclick: () => this.openToc() }),
       h('button', { class: 'icon-btn', 'aria-label': 'Оформление', html: icon('type'), onclick: () => this.openSettings() }));
     this.chLabel = h('div', { class: 'rd-ch' });
@@ -852,3 +896,5 @@ export class Reader {
     openSettingsPanel({ reader: true });
   }
 }
+
+installNotes(Reader);

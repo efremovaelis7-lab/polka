@@ -5,10 +5,12 @@ import { Shelf } from './shelf.js';
 import { Reader } from './reader.js';
 import { native, isNative } from './native.js';
 import { toast, confirmDialog, plural, h } from './ui.js';
+import { tracker } from './tracker.js';
 
 const app = {
   library,
   settings,
+  tracker,
   async openBook(rec, coverEl) {
     if (this.opening) return;
     this.opening = true;
@@ -139,6 +141,8 @@ function flyCover(el) {
 async function boot() {
   await fonts.init();
   await library.init();
+  await tracker.init();
+  tracker.on(ev => { if (ev === 'goal') toast(`Цель на сегодня выполнена — ${tracker.dayGoal} минут чтения!`, 3500); });
   app.shelf = new Shelf(app);
   app.reader = new Reader(app);
   await app.shelf.render();
