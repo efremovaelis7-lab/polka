@@ -5,8 +5,10 @@ import { h, icon, esc, sheet, confirmDialog, toast, back, plural, hashStr } from
 import { isNative, native } from './native.js';
 import { statusOf } from './tracker.js';
 import { openTracker } from './tracker-ui.js';
+import { db } from './db.js';
+import { quoteText } from './annotations.js';
 
-export const TABS = [['all', 'Все'], ['reading', 'Читаю'], ['want', 'Хочу прочесть'], ['done', 'Прочитано']];
+export const TABS = [['all', 'Все'], ['reading', 'Читаю'], ['want', 'Хочу прочесть'], ['done', 'Прочитано'], ['quotes', 'Цитаты']];
 
 const CLOTH = [
   ['#6d1f2a', '#e9c77b'], ['#1f3a5f', '#e6d3a3'], ['#2f4f3a', '#e8d9a8'], ['#5b3a1e', '#f0d9a6'],
@@ -72,9 +74,12 @@ export class Shelf {
   async render() {
     this.applyTheme();
     const tab = settings.get('shelfTab') || 'all';
+    try { this.quoteCount = ((await db.allNotes()) || []).filter(x => x.type === 'hl').length; } catch (e) { this.quoteCount = 0; }
     const books = library.sorted(settings.get('sort'), this.query, tab);
     const n = library.books.length;
     this.renderTabs(tab);
+    this.root.classList.toggle('as-quotes', tab === 'quotes');
+    if (tab === 'quotes') { await this.renderQuotes(); return; }
     this.countEl.textContent = n ? `${n} ${plural(n, 'книга', 'книги', 'книг')}` : '';
     const view = settings.get('shelfView');
     this.root.classList.toggle('as-list', view === 'list');
@@ -109,10 +114,63 @@ export class Shelf {
 
   renderTabs(tab) {
     this.tabs.replaceChildren(...TABS.map(([k, t]) => {
-      const c = library.count(k);
+      const c = k === 'quotes' ? this.quoteCount : library.count(k);
       return h('button', { class: 'tab' + (tab === k ? ' on' : ''), onclick: () => settings.set({ shelfTab: k }) },
         h('span', { text: t }), c ? h('span', { class: 'tab-c', text: c }) : null);
     }));
+    const on = this.tabs.querySelector('.tab.on');
+    if (on && (on.offsetLeft + on.offsetWidth > this.tabs.scrollLeft + this.tabs.clientWidth || on.offsetLeft < this.tabs.scrollLeft)) {
+      this.tabs.scrollLeft = on.offsetLeft - 12;
+    }
+  }
+
+  async renderQuotes() {
+    const token = (this._renderToken = (this._renderToken || 0) + 1);
+    let all = ((await db.allNotes()) || []).filter(x => x.type === 'hl');
+    if (token !== this._renderToken) return;
+    const q = (this.query || '').toLowerCase();
+    const recOf = id => library.books.find(b => b.id === id);
+    if (q) all = all.filter(n => (n.text + ' ' + (n.note || '') + ' ' + ((recOf(n.book) || {}).title || '')).toLowerCase().includes(q));
+    if (!all.length) {
+      this.list.replaceChildren(h('div', { class: 'nothing', text: q ? 'Ничего не нашлось' : 'Здесь соберутся цитаты из всех книг. Во время чтения задержи палец на тексте, выдели нужный кусок и выбери цвет маркера.' }));
+      return;
+    }
+    const groups = new Map();
+    for (const n of all.sort((a, b) => b.created - a.created)) {
+      if (!groups.has(n.book)) groups.set(n.book, []);
+      groups.get(n.book).push(n);
+    }
+    const out = [];
+    for (const [bookId, notes] of groups) {
+      const rec = recOf(bookId);
+      const meta = rec ? { title: rec.title, authors: rec.authors || [] } : { title: 'Книга убрана с полки', authors: [] };
+      notes.sort((a, b) => a.ch - b.ch || a.s.i - b.s.i || a.s.off - b.s.off);
+      const cover = rec ? this.coverBox(rec, 'cover mini') : null;
+      out.push(h('div', { class: 'qgroup' },
+        h('div', { class: 'qg-head' }, cover,
+          h('div', { class: 'qg-t' }, h('div', { class: 'qg-title', text: meta.title }),
+            h('div', { class: 'qg-sub', text: [(meta.authors || []).join(', '), `${notes.length} ${plural(notes.length, 'цитата', 'цитаты', 'цитат')}`].filter(Boolean).join(' · ') })),
+          h('button', { class: 'icon-btn sm', 'aria-label': 'Поделиться цитатами книги', html: icon('share'), onclick: () => {
+            const text = `${meta.title}${meta.authors.length ? ' — ' + meta.authors.join(', ') : ''}\n\n` + notes.map(n => `«${n.text}»` + (n.note ? `\n✎ ${n.note}` : '')).join('\n\n');
+            native.shareText(text);
+          } })),
+        ...notes.map(n => h('div', { class: 'qcard' },
+          h('button', { class: 'qc-main', onclick: () => { if (rec) this.app.openBook(rec, null, { ch: n.ch, i: n.s.i }); } },
+            h('div', { class: 'qc-quote qb-' + (n.color || 'yellow'), text: n.text }),
+            n.note ? h('div', { class: 'qc-note', text: n.note }) : null,
+            h('div', { class: 'qc-date', text: new Date(n.created).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' }) })),
+          h('div', { class: 'qc-acts' },
+            h('button', { class: 'icon-btn sm', 'aria-label': 'Копировать', html: icon('copy'), onclick: async () => {
+              await native.copyText(quoteText(n.text, meta) + (n.note ? `\n\nМоя заметка: ${n.note}` : ''));
+              toast('Скопировано', 1300);
+            } }),
+            h('button', { class: 'icon-btn sm', 'aria-label': 'Удалить', html: icon('trash'), onclick: async () => {
+              if (await confirmDialog({ title: 'Удалить цитату?', ok: 'Удалить', danger: true })) { await db.delNote(n.id); this.render(); }
+            } }))))));
+      if (cover && rec.hasCover) library.coverUrl(rec).then(u => { if (u) { cover.classList.add('has-img'); cover.prepend(h('img', { class: 'cover-img', src: u, alt: '' })); } });
+    }
+    if (token !== this._renderToken) return;
+    this.list.replaceChildren(...out);
   }
 
   perRow() {
@@ -261,7 +319,7 @@ export class Shelf {
         h('div', { class: 'collections' }, ...TABS.map(([k, t]) => h('button', {
           class: 'coll' + ((settings.get('shelfTab') || 'all') === k ? ' on' : ''),
           onclick: () => { settings.set({ shelfTab: k }); sh.close(); },
-        }, h('span', { text: t }), h('span', { class: 'coll-c', text: library.count(k) }))))),
+        }, h('span', { text: t }), h('span', { class: 'coll-c', text: k === 'quotes' ? (this.quoteCount || 0) : library.count(k) }))))),
       h('div', { class: 'p-sec' },
         h('div', { class: 'p-h', text: 'Вид' }), seg('shelfView', [['shelf', 'Полки'], ['list', 'Список']]),
         h('div', { class: 'p-h', text: 'Полки' }),

@@ -11,13 +11,13 @@ const app = {
   library,
   settings,
   tracker,
-  async openBook(rec, coverEl) {
+  async openBook(rec, coverEl, pos = null) {
     if (this.opening) return;
     this.opening = true;
     const fly = coverEl ? flyCover(coverEl) : null;
     try {
       const book = await library.open(rec);
-      await this.reader.open(rec, book);
+      await this.reader.open(rec, book, pos);
       rec.lastOpened = Date.now();
       library.update(rec);
     } catch (e) {

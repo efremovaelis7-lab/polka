@@ -152,6 +152,32 @@ export function confirmDialog({ title, text, ok = 'Да', cancel = 'Отмена
   });
 }
 
+export function promptDialog({ title, value = '', placeholder = '', ok = 'Сохранить', cancel = 'Отмена' }) {
+  return new Promise(resolve => {
+    const input = h('input', { class: 'dialog-input', type: 'text', placeholder, maxlength: 40 });
+    input.value = value;
+    const scrim = h('div', { class: 'scrim show dialog-scrim' });
+    const box = h('div', { class: 'dialog' },
+      title ? h('div', { class: 'dialog-title', text: title }) : null,
+      input,
+      h('div', { class: 'dialog-btns' },
+        h('button', { class: 'btn ghost', text: cancel, onclick: () => done(null) }),
+        h('button', { class: 'btn primary', text: ok, onclick: () => done(input.value.trim() || null) })));
+    document.body.append(scrim, box);
+    requestAnimationFrame(() => { box.classList.add('show'); input.focus(); input.select(); });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') done(input.value.trim() || null); });
+    const bt = back.push(() => done(null, true));
+    scrim.addEventListener('click', () => done(null));
+    function done(v, fromBack) {
+      if (!fromBack) back.remove(bt);
+      box.classList.remove('show');
+      scrim.remove();
+      setTimeout(() => box.remove(), 200);
+      resolve(v);
+    }
+  });
+}
+
 export function debounce(fn, ms) {
   let t = 0;
   const d = (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };

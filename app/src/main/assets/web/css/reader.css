@@ -239,3 +239,18 @@ body[data-ui="dark"] .sb-btn.danger { color: #F08A7E; }
 .nl-empty { text-align: center; color: var(--ui-muted); padding: 30px 20px; font-size: 15px; line-height: 1.5; }
 .nl-empty .ic { width: 40px; height: 40px; color: var(--ui-accent); margin-bottom: 8px; }
 .nl-export { margin: 16px auto 0; display: flex; }
+
+/* ===================================================================== бережный режим */
+.rd-content, .rd-scroll-content { letter-spacing: var(--ls, 0); word-spacing: var(--ws, 0); -webkit-text-stroke: var(--stroke, 0) currentColor; }
+.rd-chapter h1, .rd-chapter h2, .rd-chapter h3, .rd-chapter .title { letter-spacing: 0; }
+.rd-dim, .rd-warm { position: absolute; inset: 0; pointer-events: none; z-index: 35; }
+.rd-dim { background: #000; opacity: var(--dim, 0); }
+.rd-warm { background: #FF9A3C; mix-blend-mode: multiply; opacity: calc(var(--warm, 0) * .55); z-index: 34; }
+.eye-wrap { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, .35); opacity: 0; transition: opacity .3s; }
+.eye-wrap.show { opacity: 1; }
+.eye-card { width: min(84vw, 340px); padding: 24px 22px 18px; border-radius: 22px; background: var(--ui-bg); color: var(--ui-fg); text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, .35); display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.eye-t { font: italic 600 22px "Brand", Georgia, serif; }
+.eye-s { font-size: 15px; line-height: 1.45; color: var(--ui-muted); }
+.eye-n { display: flex; align-items: baseline; gap: 4px; margin: 6px 0 4px; }
+.eye-n b { font-size: 48px; font-variant-numeric: tabular-nums; color: var(--ui-accent); }
+.eye-n span { color: var(--ui-muted); }

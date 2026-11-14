@@ -14,7 +14,7 @@ import { applyHighlights } from './annotations.js';
 import { installNotes } from './reader-notes.js';
 
 const BLOCKS = 'p,h1,h2,h3,h4,h5,h6,li,dt,dd,pre,table,.imgp,.empty-line,figure,hr';
-const LAYOUT_KEYS = ['font', 'fontSize', 'lineHeight', 'margin', 'align', 'hyphens', 'indent', 'paraSpace', 'weight', 'bionicWeight', 'spread', 'mode'];
+const LAYOUT_KEYS = ['font', 'fontSize', 'lineHeight', 'margin', 'align', 'hyphens', 'indent', 'paraSpace', 'weight', 'bionicWeight', 'spread', 'mode', 'letterSpacing', 'wordSpacing'];
 const RENDER_KEYS = ['bionic', 'bionicStrength'];
 
 function waitImages(root) {
@@ -132,7 +132,8 @@ export class Reader {
     this.scrollContent = h('div', { class: 'rd-scroll-content' });
     this.scrollEl.appendChild(this.scrollContent);
     this.buildChrome();
-    this.root.append(this.stage, this.scrollEl, this.top, this.bottom);
+    this.root.append(this.stage, this.scrollEl, this.top, this.bottom,
+      h('div', { class: 'rd-warm' }), h('div', { class: 'rd-dim' }));
     document.body.appendChild(this.root);
     this.initNotes();
 
@@ -153,7 +154,7 @@ export class Reader {
 
   // ---------------------------------------------------------------- открыть / закрыть
 
-  async open(rec, book) {
+  async open(rec, book, posOverride = null) {
     this.rec = rec;
     this.book = book;
     this.tpls.clear();
@@ -178,7 +179,9 @@ export class Reader {
     if (statusOf(rec) !== 'done') rec.status = 'reading';
     native.setCustomSelection(true);
     tracker.activity(0);
-    const pos = rec.pos || { ch: 0, i: 0 };
+    this.eyeSec = 0;
+    this.eyeLast = 0;
+    const pos = posOverride || rec.pos || { ch: 0, i: 0 };
     if (pos.ch >= book.chapters.length) pos.ch = 0;
     await this.goTo(pos);
   }
@@ -242,6 +245,11 @@ export class Reader {
     st.setProperty('--weight', s.weight);
     st.setProperty('--bw', s.bionicWeight);
     st.setProperty('--grain', s.grain ? (t.grain || 0) : 0);
+    st.setProperty('--ls', (s.letterSpacing || 0) + 'em');
+    st.setProperty('--ws', (s.wordSpacing || 0) + 'em');
+    st.setProperty('--stroke', (s.stroke || 0) + 'px');
+    st.setProperty('--dim', s.dim || 0);
+    st.setProperty('--warm', s.warm || 0);
     this.root.classList.toggle('dark', !t.light);
     this.root.classList.toggle('glow', !!t.glow);
     if (!this.hidden) {
@@ -368,8 +376,44 @@ export class Reader {
   afterMove(pages = 0) {
     this.updateChrome();
     this.updateRibbon();
-    if (pages) tracker.activity(pages);
+    if (pages) { tracker.activity(pages); this.eyeTick(); }
     this.save();
+  }
+
+  // напоминание «20-20-20»: каждые 20 минут чтения посмотреть вдаль 20 секунд
+  eyeTick() {
+    const now = Date.now();
+    if (this.eyeLast && now - this.eyeLast < 5 * 60 * 1000) this.eyeSec += Math.min(now - this.eyeLast, 3 * 60 * 1000) / 1000;
+    this.eyeLast = now;
+    if (settings.get('eyeBreaks') && this.eyeSec >= 20 * 60) {
+      this.eyeSec = 0;
+      this.eyeBreak();
+    }
+  }
+
+  eyeBreak() {
+    let left = 20;
+    const num = h('b', { text: '20' });
+    const card = h('div', { class: 'eye-card' },
+      h('div', { class: 'eye-t', text: 'Глазам пора отдохнуть' }),
+      h('div', { class: 'eye-s', text: 'Посмотри вдаль, на что-нибудь в 5–6 метрах, и поморгай.' }),
+      h('div', { class: 'eye-n' }, num, h('span', { text: 'сек' })),
+      h('button', { class: 'btn ghost small', text: 'Пропустить', onclick: () => done() }));
+    const wrap = h('div', { class: 'eye-wrap' }, card);
+    this.root.appendChild(wrap);
+    requestAnimationFrame(() => wrap.classList.add('show'));
+    const bt = back.push(() => done(true));
+    const timer = setInterval(() => {
+      left--;
+      num.textContent = String(left);
+      if (left <= 0) { card.querySelector('.eye-t').textContent = 'Можно читать дальше'; setTimeout(() => done(), 900); clearInterval(timer); }
+    }, 1000);
+    const done = fromBack => {
+      clearInterval(timer);
+      if (!fromBack) back.remove(bt);
+      wrap.classList.remove('show');
+      setTimeout(() => wrap.remove(), 300);
+    };
   }
 
   anchorNow() {
@@ -425,7 +469,7 @@ export class Reader {
     const keys = Object.keys(changed);
     if (keys.some(k => RENDER_KEYS.includes(k))) return this.relayout({ rerender: true });
     if (keys.some(k => LAYOUT_KEYS.includes(k))) return this.relayout();
-    if (keys.some(k => ['theme', 'bionicFade', 'grain'].includes(k))) { this.applyStyle(); this.applyDevice(); }
+    if (keys.some(k => ['theme', 'bionicFade', 'grain', 'stroke', 'dim', 'warm'].includes(k))) { this.applyStyle(); this.applyDevice(); }
     if (keys.some(k => ['volumeKeys', 'keepScreenOn', 'brightness', 'fullscreen'].includes(k))) this.applyDevice();
   }
 
